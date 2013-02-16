@@ -14,6 +14,8 @@
 * 陈绍壮
 * 紫溪
 * 灵吾
+* jefffyang
+* 维尼Bernie
 
 ### 目录结构介绍
 + pool 

@@ -12,6 +12,8 @@
 * Estilllan
 * Rexwolf
 * 陈绍壮
+* 紫溪
+* 灵吾
 
 ### 目录结构介绍
 + pool 

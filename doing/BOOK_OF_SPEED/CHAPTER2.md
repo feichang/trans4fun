@@ -9,7 +9,7 @@
 
 让我们一起看下在 **图2.1.** 的时间线，它描述了网页 2.0 一生中的各个阶段，并且每个阶段对应了人类成长的关键历程。
 
-![网页 2.0 的一生](http://img03.taobaocdn.com/tps/i3/T1hhFnXCxgXXX5Ovs7-800-600.png "网页 2.0 的一生")
+![网页 2.0 的一生](http://img04.taobaocdn.com/tps/i4/T1ZmBoXxlbXXX5Ovs7-800-600.png "网页 2.0 的一生")
 
 *图 2.1. 网页 2.0 的一生*
 

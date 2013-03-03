@@ -158,7 +158,7 @@ NetMon 是一个 Window 下的工具，可以从数据包层面监听和查看�
      
     <link href="all.css" type="text/css" rel="stylesheet" />
      
-一个页面一般会分出几个媒体类型的样式（media stylesheets），但毫无例外这些不同媒体类型的样式都需要合并，放进 `@media print {…}` 声明里面。第八章我们会更详细地介绍优化 CSS 以提高渲染效率的方法，另外有个地方很让人好奇，就是一旦媒体类型是 print 的样式没加载之前，页面不会渲染任何东西。
+一个页面一般会分出几个媒体类型的样式（media stylesheets），但毫无例外这些不同媒体类型的样式都需要合并，放进 `@media print {…}` 声明里面。第八章我们会更详细地介绍优化 CSS 以提高渲染效率的方法，另外有个地方很让人好奇，就是一旦媒体类型是 **print** 的样式没加载之前，页面不会渲染任何东西。
 
 [译者注：这一段有很多错误的地方。首先不同媒体类型的样式不应该直接合并在`@media print`，媒体类型选择器并不能嵌套，但可以把不同媒体类型放在同一个 CSS 文件。第二，浏览器只会阻塞影响此页面的样式文件，对于一般 PC 来说，浏览器会等待媒体类型为空或「all」或「screen」的样式加载完成才开始渲染，并不是「print」]
 
@@ -177,14 +177,271 @@ NetMon 是一个 Window 下的工具，可以从数据包层面监听和查看�
 >> header('Expires: ' . gmdate('D, d M Y h:m:s', $expiration) . ' GMT');`
 
 
+打包的另外一个缺点是代码会变得非常庞大，这可能会影响缓存因为只要改动里面一点点的话都需要重新打包，这样用户就必须重新下载整个打包后的文件。不过从另一个角度也说明了缓存并没有想象中重要，为没有缓存的情况去优化还是必须的。有一个解决方法是打包成两份文件，一份是框架性代码，一般很少改动；另一份是经常改动的代码。
+
+尽管打包对开发带来不便，但这个方法还是强烈推荐的优化手段，它们带来的好处远比缺点重要。
 
 
+## 合并图片
+
+现在我们知道了合并脚本和样式为什么能改善性能，紧接着我们看一下怎么去减少那些大量的图片请求。当提到网页图片时，一般分为两种：
+
+* 背景图片（Background images）类似于 CSS 里 `background-image` 和 `list-style-image` 所引用图片。这些「装饰性」的图片让页面看起来美轮美奂而且感觉很棒，但它们对于页面功能来说却不是必须的。一旦 CSS 被禁止，网页还是可以正常使用，虽然没那么好看。
+* 内容图片（Content images）一般是 `<img />` 标签所引用的图片。叫它内容标签时因为它们专门为页面上某个目的而出现。即使浏览器禁用了 CSS，这些图片也是可见的。
+
+接着让我们看下怎么减少这两种图片的请求 - 分别是合并成 CSS 精灵和使用 dataURI。这两种技术适用于任何类型的图片，但精灵图一般用于背景图，而 dataURI 则两者适用。
+
+### CSS 精灵图
+
+CSS 精灵图是把多张小图合并成一张大图以减少图片请求。制作过程很简单，只需要新建一张空白大图然后把小图逐个紧靠着粘贴在上面。然后用 CSS 属性 `background-position` 显示需要的那一部分。这是一项非常优秀的技术，因为可以轻易地把一堆小图标等合并成一张图片一个请求，在节省请求的同时了避免了请求带来的额外消耗。精灵图的另外一个好处是可以预加载图片。如果鼠标悬浮时显示一张新图，这一张新图完全可以是同一张图片，只不过是 `background-position` 改变了。
+
+让我们看一下 Yahoo! 搜索页所用的一张精灵图。**图3.7.** 就是一张完整的精灵图，里面有大量的图标，而其他的一些图案我们一般称作「精灵元素」。在图片的下方可以看到一个小的地球图标，在 **图 3.8.** 中这个图标就使用在了「Show All」标签的旁边。
+
+![Yahoo! 搜索页所使用的精灵图](http://img03.taobaocdn.com/tps/i3/T1y3hvXuNdXXaT1FD4-200-142.png "Yahoo! 搜索页所使用的精灵图")
+
+*图 3.7. Yahoo! 搜索页所使用的精灵图*
+
+![页面上所使用的地球图标](http://img03.taobaocdn.com/tps/i3/T1pc0vXCFdXXailrMN-196-206.png "页面上所使用的地球图标")
+
+*图 3.8. 页面上所使用的地球图标*
+
+一般使用 X 和 Y 坐标系统相对于顶部和左侧定位精灵图，那个地球图标的位置则是 x=101, y=108（**图 3.9.**）。为了在页面上显示这个图标，编写 CSS 代码时有以下步骤：
+
+![地球图标在精灵图里的位置](http://img01.taobaocdn.com/tps/i1/T1zPhtXuphXXaT1FD4-200-142.png "地球图标在精灵图里的位置")
+
+*图 3.9. 地球图标在精灵图里的位置* 
+
+* 设置 `background-image` 为精灵图的 URL，如 `sprite.png`
+* 设置 `background-position` 为精灵元素的坐标，带减号，上面的例子则是 `-101px -108px`
+* 为了防止精灵图别的部分显示出来，一般会给页面元素设置跟精灵元素一样大小的宽高。
+
+最后的 CSS 代码是这样的：
+
+    .all-sites-icon {
+      background-image: url(sprite.png);
+      background-position: -101px -108px;
+      width: 16px;
+      height: 16px;
+    }
+    
+
+### 制作精灵图的工具
+
+制作和维护精灵图是一件苦差事，因为要一直计算各个小图的各种大小和位置。幸运的是有几个工具可以逃离这个苦海。其中一个免费的工具由 [csssprites.com]() (**图 3.10.**) 提供。它允许你上传多张小图然后自动生成一张大图：
+
+![CSSSprites.com](http://img04.taobaocdn.com/tps/i4/T1ad8vXCxdXXX4U177-800-535.png "CSSSprites.com")
+
+*图 3.10. CSSSprites.com*
+
+* 小图
+* 显示每张小图所需要的 CSS 代码
+* 一个使用生成的精灵图和 CSS 代码的例子，可以看到真实页面的效果
+
+### Data URIs
+
+Data URIs 是一种可以把图片嵌入 HTML 页面或 CSS 样式文件中的技术。
+
+相对于直接设置图片的 URL（或者 URI），这种技术允许你通过 URL 方式引用页面里面的内容（实际上就是里面的数据）
+
+一般图片标签是这样的：
+
+    <img src="http://example.org/myimage.png" />
+    
+而使用 data URI 的图片是这样的：
+
+    <img src="data:image/png;base64,iVBOR...rkJggg==" />
+    
+这种语法也许有点吓人，但它包含了以下部分：
+
+* `data:` - 代替了 `http:` 协议
+* `image/png` - 图片的类型
+* `base64` - 图片的编码类型
+* 剩下逗号后面的内容就是文件的编码内容
+
+因为图片内容是二进制的，有大量奇怪的字符会阻碍 HTML 代码的解析，所以用 base64 编码图片内容是很必要的。虽然可以指定编码的类型，但 base64 是现在浏览器中唯一支持的编码方法。Base64 就是用一堆字符（64 个）去代替二进制的内容。
+
+大多数服务端的编程语言有内置的函数支持 base64 编解码。如 PHP 中有 `base64_encode()` 和 `base64_decode()`。看下面代码：
+
+    <?php echo base64_encode('speed matters'); ?>
+   
+会输出 `c3BlZWQgbWF0dGVycw==`，这就是 base64 版的字符串 「speed matters」。
+
+如果机器上安装有 PHP，则可以轻易地用命令行编码一个文件，如下：
+
+    $ php -r "echo base64_encode(file_get_contents('myimage.png'));"
+    
+如果不习惯使用命令行或者服务端编程语言，也可以选择一些提供在线 base64 编解码的工具。
+
+除了可以在 `<img />` 标签中使用 data URI 图片，在 CSS 样式中也可以使用这类图片，尤其是一些动态的样式，或者各种原因不能使用精灵图的情况。
+
+在 CSS 中使用 data URI 的预发如下：
+
+    .myclass {
+      background-image: url("data:image/png;base64,iVBOR...rkJggg==");
+    }
 
 
+### 现实中的 data URI
+
+如果你很好奇 data URI 是否真的有人在用，就让我们来看一些现实的例子吧。Google 和 Yahoo! 搜索非常在意它们的性能，所以它们线上都使用了 data URI。
+
+Google 把 data URI 用于搜索结果视频和图片的缩略图，以减少大量的图片请求。Data URI 图片的缺点是无法缓存，而且让页面变得更重。不过如这个案例中的搜索结果，一般一个月后用户不会再看到同一张图片，因为用户很少会搜索重复的东西，而且很可能已经换成新的结果了。
+
+![Google 搜索结果中的 data URI](http://img04.taobaocdn.com/tps/i4/T13BdwXrBbXXcQhvs7-800-565.png "Google 搜索结果中的 data URI")
+
+*图 3.11. Google 搜索结果中的 data URI*
+
+Yahoo! 搜索把 data URI 用于 CSS 中水平重复的渐变图案（**图 3.12.**）。如果用精灵图制作这种图案，很可能需要展开整个精灵图，浪费了大量图片空间。相反的，可以使用 data URL 在 CSS 文件里嵌入 1px 宽的图案。
+
+![样式文件中的 data URI](http://img01.taobaocdn.com/tps/i1/T19sRvXttfXXX32uI7-800-473.png "样式文件中的 data URI")
+
+*图 3.12. 样式文件中的 data URI*
 
 
+### MHTML
+
+现在你可能觉得 data URI 的预发很复杂，但一旦看过 MHTML 之后，你就不会这么觉得了。MHTML 是「最主流」的浏览器 - Internet Explorer 6 和 7 所支持的一项技术（你会觉得有关于网页设计的书不会提及 IE6 吗？）。Data URI 支持所有的现代浏览器，保留 IE8，但不支持 IE6 和 IE7。所以对于这个限制你可以有两个选择：
+
+* 现代浏览器使用 data URI，IE6-7 使用传统的 URL。这样的话旧 IE 用户就得不到一致的优化体验，不过使用现代浏览器的用户是没有问题的。
+* 都使用 data URI 但 IE8 以下使用 MHTML。
+
+MHTML 意思是 MIME HTML，这是一个把多个文件（部分）嵌入一个文档的技术。MIME（Multipurpose Internet Mail Extensions 多用途邮件插件）一般用于邮件系统，可以使一封邮件里包含多个部分（纯文本、HTML、附件等）
+
+让我们看下怎么用 MHTML 在 CSS 样式里嵌入文件。
+
+首先，我们看一下用来表示一张图片的「部分」代码：
+
+    Content-Location: myimage
+    Content-Transfer-Encoding: base64
+
+    iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAD....U5ErkJggg==
+    
+你也许可以猜到最长的那部分是使用了 base64 编码的文件内容。前面两行是描述文件的头信息，第一行是唯一辨识符 `myimage`，第二行则是编码方式 `base64`
+
+为了能嵌入多个这些「部分」，我们需要把它们分隔开，一般会使用「分隔符」，如「MYSEPARATOR」。当然我们也需要一个「头信息」以跟文档的其它部分区分开，顺便定义一下这个「分隔符」是怎样的。最后，整个部分看起来是这样的：
+
+    Content-Type: multipart/related; boundary="MYSEPARATOR"
+ 
+    --MYSEPARATOR
+    [here comes part one]
+    --MYSEPARATOR
+    [here is part two, followed by a final separator]
+    --MYSEPARATOR--
+
+注意里面的双横线，这是必须的。
+
+我们需要把整个部分注释在 CSS 文件里。然后在 CSS 的 `background-image` 属性里引用唯一辨识符的文件，就像这样：
+
+    .myclass {
+      background-image: url(mhtml:http://example.org/styles.css!myimage);
+    }
+
+使用 MHTML 的 URL 会使用 `mthml:` 协议，接着是绝对路径的 URL，然后叹号跟着文件的唯一辨识符。
+
+一个完整可用的 CSS 看起来像这样：
+
+    /*
+    Content-Type: multipart/related; boundary="MYSEPARATOR"
+
+    --MYSEPARATOR
+    Content-Location: myimage
+    Content-Transfer-Encoding: base64
+
+    iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAD....U5ErkJggg==
+    --MYSEPARATOR
+    Content-Location: another
+    Content-Transfer-Encoding: base64
+
+    iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAA....U5ErkJggg==
+    --MYSEPARATOR--
+    */
+    .myclass {
+      background-image: url(mhtml:http://example.org/styles.css!myimage);
+    }
+
+    .myotherclass {
+      background-image: url(mhtml:http://example.org/styles.css!another);
+    }
+    
+
+### MHTML 的缺点
+
+当然的， MHTML 也存在一些缺点：
+
+* 十分复杂。不过一旦有了自动化的服务端脚本自动为你生成 MHTML，这就变得没那么繁杂了，所以这也不算太大的问题。
+* 所有的工作只是为了支持低级的 IE 浏览器。
+* 如果你让所有浏览器都适用同一个样式，那就会加倍浏览器的流量，因为这张图片可能同时用 data URI 和 MHTML 编码在网页里。不过另外一个选择就是根据不同浏览器提供不同的样式文件。
+
+这些有点严重的缺点让 MHTML 并不适用于大多数站点。不过如果你真的需要跨浏览器的超高速的体验，MHTML 在 IE8 以下的确是一个可行的方案。
 
 
+## 「永不过期」策略
+
+如果 50% 的用户访问时不带有任何缓存，这也意味着剩下的 50% 用户或多或少带有一些资源缓存在他们系统上的，我们也不能忽略他们。除了那些动态生成的内容和新图片，我们完全可以不用重复下载其它静态的资源以提高用户体验。为了提高这种重复访问的体验，我们需要采用「永不过期」的策略。
+
+不过在深入之前，我们得简单看一下 HTTP 请求是长什么样的，它有着一定语法、头部信息（Headers）和主体部分（body）。
+
+### HTTP 头部信息
+
+浏览器和服务器之间用 HTTP 协议交流通信。浏览器发出请求，然后服务器响应。每一个请求和响应都有头部信息，但主体内容是可选的。主体内容就是实际上通信的内容，而头部信息则包含描述数据的一些信息。
+
+> ## HTTP/TCP/IP 的关系
+> 我们已经聊过数据包，它们也包含了一定的头信息和主体数据。现在我们来谈谈 HTTP 的头信息，看它们之间有什么关系。
+> 当服务器需要给浏览器传送文件时，如一张图片，它会先在硬盘里找到这张图片，然后新建一个头信息表单，往里面填写这张图片的一些信息，紧接着用这个头信息表单和图片内容生成 HTTP 响应返回给浏览器。这个 HTTP 响应通过服务器软件中的 TCP 协议发送。TCP 协议把这个 HTTP 请求分割成很小的数据包，然后用 IP 协议这个向浏览器发送。
+
+可以把 HTTP 响应想象成信箱中的信件。信件中的信则是响应的主题内容，寄件信息则代表头信息，上面写着你的信息、对方的信息和邮递员怎么处理这封信件等等。如果你是一个秘密特工，也许会告诉对方请阅后即焚。如果是一份万恶的缴税通知，你可能就要把这份文档保存在夹子里至少七年。在 HTTP 的头信息里，这些行为都会被介绍到。
+
+要看头信息长什么样其实很简单。在 Firefox 里只要打开 Firebug 的网络面板然后展开其中一个请求（**图 3.13.**）
+
+![Firebug 网络面板的 HTTP 头信息视图](http://img04.taobaocdn.com/tps/i4/T1OXRyXEXbXXaxHKA7-800-461.png "Firebug 网络面板的 HTTP 头信息视图")
+
+一个简单的 HTTP 请求看起来是这样的：
+
+    GET / HTTP/1.1
+    Host: search.yahoo.com
+    User-Agent: Mozilla/5.0 ...
+
+请求的第一行意思是「获取 / 的页面」（ / 代表这这个域名下的根目录）。然后紧跟着一系列的 key-value 键值对。每个键值对占一行，键和值之间用冒号分隔。
+
+类似的，HTTP 响应头信息第一行包含了响应结果（如，200 OK 或 404 Not Found），然后紧接着一系列键值对。头信息的最后会有一行空白，然后剩下的就是响应的主体内容。
+
+    HTTP/1.1 200 OK
+    Transfer-Encoding: chunked
+    Content-Type: text/html; charset=UTF-8
+    Content-Encoding: gzip
+
+    <!doctype html>
+    <html>
+      <head><title>...
+
+每一个头信息都有它的特殊含义和功能，其中的一些对性能优化来说很重要。我们会在本书剩下的部分逐个提及，但我们先从过期（Expires）信息开始。
+
+### Expires 信息
+
+Expires （过期）头信息是 HTTP 头信息中影响性能优化的重要信息之一。它用来告诉浏览器这个资源或文件应该保存多久（比如上面的「阅后即焚」或者「保存七年」）。
+
+    Expires: Mon, 09 Sep 2019 07:04:49 GMT
+    
+上面这个例子表示这个文件保留缓存直到 2019 年。另一个头信息叫做 `Cache-Control:`，它描述了具体的过期时间，用秒数来表示而不是日期。这两个头信息都有助于缓存资源和文件。
+
+一旦 `Expires` 头信息丢失，浏览器就会估计这个文件的过期时间，在觉得这个文件已经过期了或者有新版本的时候就会选择性地去发出请求。
+
+「永不过期」策略就是把一些静态资源（如脚本、样式文件和图片）的过期时间设为很久很久以后，如十年之后。这是一件很简单的事情，只需要稍微配置一下服务器。假设服务器用 Apache（最主流的），只需要编辑一个叫 `.htaccess` 的文件（大多都空间服务商都允许编辑），添加以下内容：
+
+    ExpiresActive On
+    ExpiresByType application/x-javascript "access plus 10 years"
+    ExpiresByType text/css "access plus 10 years"
+    ExpiresByType image/png "access plus 10 years"
+
+现在如果你在 2010/5/03 去请求一个 png 图片，Apache 就会添加一个这样的 HTTP 头。
+
+    Expires: Sun, 03 May 2020 09:09:47 GMT
+
+浏览器就会在 2020 年之前都不会去请求这个文件，也就是所谓的「永不过期」。
+
+这种方法的缺点就是无法再去修改这个文件，因为这个文件已经被一些用户缓存到了 2020 年。如果需要修改，则需要存为别的文件名然后修改所有这个文件的引用。新的文件名你可以使用递增的数值，或者时间戳，再或者是文件内容的哈希值，这样文件名就对应了文件的实际内容。
+
+> 要注意的是，设置了 Expires 头信息就不一定意味着这个文件一定存在于缓存内，它只是一个「建议」行为。浏览器不一定完全按照你说的去做，它只是「被建议」这么做。
 
 
 
